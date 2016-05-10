@@ -91,6 +91,9 @@ public class HdfsTestUtil {
     
     
     System.setProperty("solr.hdfs.blockcache.global", Boolean.toString(LuceneTestCase.random().nextBoolean()));
+
+    //FIXME: tells UpdateHandler to use HdfsUpdateLog without specifying such a class on UpdateLog in solrconfig.xml
+    System.setProperty("test.hdfs.forceHdfsUpdateLog", "true");
     
     final MiniDFSCluster dfsCluster;
     

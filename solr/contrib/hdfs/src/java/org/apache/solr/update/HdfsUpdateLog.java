@@ -35,6 +35,8 @@ import org.apache.lucene.util.BytesRef;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
 import org.apache.solr.common.util.IOUtils;
+import org.apache.solr.core.DirectoryFactory;
+import org.apache.solr.core.HdfsDirectoryFactory;
 import org.apache.solr.core.PluginInfo;
 import org.apache.solr.core.SolrCore;
 import org.apache.solr.util.HdfsUtil;
@@ -47,7 +49,7 @@ public class HdfsUpdateLog extends UpdateLog {
   private final Object fsLock = new Object();
   private FileSystem fs;
   private volatile Path tlogDir;
-  private final String confDir;
+  private String confDir; // gets initialised in init(UpdateHandler, SolrCore)
   private Integer tlogDfsReplication;
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
@@ -55,14 +57,6 @@ public class HdfsUpdateLog extends UpdateLog {
   
   // used internally by tests to track total count of failed tran log loads in init
   public static AtomicLong INIT_FAILED_LOGS_COUNT = new AtomicLong();
-
-  public HdfsUpdateLog() {
-    this.confDir = null;
-  }
-  
-  public HdfsUpdateLog(String confDir) {
-    this.confDir = confDir;
-  }
   
   // HACK
   // while waiting for HDFS-3107, instead of quickly
@@ -116,6 +110,12 @@ public class HdfsUpdateLog extends UpdateLog {
   
   @Override
   public void init(UpdateHandler uhandler, SolrCore core) {
+    DirectoryFactory dirFactory = core.getDirectoryFactory();
+    if (dirFactory instanceof HdfsDirectoryFactory) {
+      confDir = ((HdfsDirectoryFactory)dirFactory).getConfDir();
+    } else {
+      confDir = null;
+    }
     
     // ulogDir from CoreDescriptor overrides
     String ulogDir = core.getCoreDescriptor().getUlogDir();

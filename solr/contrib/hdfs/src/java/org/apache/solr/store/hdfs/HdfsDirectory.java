@@ -162,6 +162,7 @@ public class HdfsDirectory extends BaseDirectory {
         new Path(hdfsDirPath, name));
   }
   
+  @Override
   public long fileModified(String name) throws IOException {
     FileStatus fileStatus = getFileSystem().getFileStatus(
         new Path(hdfsDirPath, name));
