@@ -679,11 +679,8 @@ public class CollectionsHandler extends RequestHandlerBase implements Permission
       @Override
       Map<String, Object> call(SolrQueryRequest req, SolrQueryResponse rsp, CollectionsHandler handler) throws Exception {
         NamedList<Object> results = new NamedList<>();
-        Set<String> collections = handler.coreContainer.getZkController().getZkStateReader().getClusterState().getCollections();
-        List<String> collectionList = new ArrayList<>();
-        for (String collection : collections) {
-          collectionList.add(collection);
-        }
+        Map<String, DocCollection> collections = handler.coreContainer.getZkController().getZkStateReader().getClusterState().getCollectionsMap();
+        List<String> collectionList = new ArrayList<>(collections.keySet());
         results.add("collections", collectionList);
         SolrResponse response = new OverseerSolrResponse(results);
         rsp.getValues().addAll(response.getResponse());
@@ -796,6 +793,57 @@ public class CollectionsHandler extends RequestHandlerBase implements Permission
       Map<String, Object> call(SolrQueryRequest req, SolrQueryResponse rsp, CollectionsHandler handler)
           throws Exception {
         return req.getParams().required().getAll(null, COLLECTION_PROP);
+      }
+    },
+    BACKUP_OP(BACKUP) {
+      @Override
+      Map<String, Object> call(SolrQueryRequest req, SolrQueryResponse rsp, CollectionsHandler h) throws Exception {
+        req.getParams().required().check(NAME, COLLECTION_PROP);
+
+        String collectionName = req.getParams().get(COLLECTION_PROP);
+        ClusterState clusterState = h.coreContainer.getZkController().getClusterState();
+        if (!clusterState.hasCollection(collectionName)) {
+          throw new SolrException(ErrorCode.BAD_REQUEST, "Collection '" + collectionName + "' does not exist, no action taken.");
+        }
+
+        String location = req.getParams().get("location");
+        if (location == null) {
+          location = (String) h.coreContainer.getZkController().getZkStateReader().getClusterProps().get("location");
+        }
+        if (location == null) {
+          throw new SolrException(ErrorCode.BAD_REQUEST, "'location' is not specified as a query parameter or set as a cluster property");
+        }
+        Map<String, Object> params = req.getParams().getAll(null, NAME, COLLECTION_PROP);
+        params.put("location", location);
+        return params;
+      }
+    },
+    RESTORE_OP(RESTORE) {
+      @Override
+      Map<String, Object> call(SolrQueryRequest req, SolrQueryResponse rsp, CollectionsHandler h) throws Exception {
+        req.getParams().required().check(NAME, COLLECTION_PROP);
+
+        String collectionName = SolrIdentifierValidator.validateCollectionName(req.getParams().get(COLLECTION_PROP));
+        ClusterState clusterState = h.coreContainer.getZkController().getClusterState();
+        //We always want to restore into an collection name which doesn't  exist yet.
+        if (clusterState.hasCollection(collectionName)) {
+          throw new SolrException(ErrorCode.BAD_REQUEST, "Collection '" + collectionName + "' exists, no action taken.");
+        }
+
+        String location = req.getParams().get("location");
+        if (location == null) {
+          location = (String) h.coreContainer.getZkController().getZkStateReader().getClusterProps().get("location");
+        }
+        if (location == null) {
+          throw new SolrException(ErrorCode.BAD_REQUEST, "'location' is not specified as a query parameter or set as a cluster property");
+        }
+
+        Map<String, Object> params = req.getParams().getAll(null, NAME, COLLECTION_PROP);
+        params.put("location", location);
+        // from CREATE_OP:
+        req.getParams().getAll(params, COLL_CONF, REPLICATION_FACTOR, MAX_SHARDS_PER_NODE, STATE_FORMAT, AUTO_ADD_REPLICAS);
+        copyPropertiesWithPrefix(req.getParams(), params, COLL_PROP_PREFIX);
+        return params;
       }
     };
     CollectionAction action;

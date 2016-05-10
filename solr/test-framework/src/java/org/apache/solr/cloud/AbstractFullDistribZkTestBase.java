@@ -338,7 +338,7 @@ public abstract class AbstractFullDistribZkTestBase extends AbstractDistribZkTes
 
   }
 
-  protected void waitForCollection(ZkStateReader reader, String collection, int slices) throws Exception {
+  protected static void waitForCollection(ZkStateReader reader, String collection, int slices) throws Exception {
     // wait until shards have started registering...
     int cnt = 30;
     while (!reader.getClusterState().hasCollection(collection)) {
@@ -1353,7 +1353,7 @@ public abstract class AbstractFullDistribZkTestBase extends AbstractDistribZkTes
 
     if (slices == null) {
       throw new RuntimeException("Could not find collection "
-          + DEFAULT_COLLECTION + " in " + clusterState.getCollections());
+          + DEFAULT_COLLECTION + " in " + clusterState.getCollectionsMap().keySet());
     }
 
     for (CloudJettyRunner cjetty : cloudJettys) {
@@ -1916,9 +1916,7 @@ public abstract class AbstractFullDistribZkTestBase extends AbstractDistribZkTes
     if (collection != null) {
       cs = clusterState.getCollection(collection).toString();
     } else {
-      Map<String,DocCollection> map = new HashMap<>();
-      for (String coll : clusterState.getCollections())
-        map.put(coll, clusterState.getCollection(coll));
+      Map<String,DocCollection> map = clusterState.getCollectionsMap();
       CharArr out = new CharArr();
       new JSONWriter(out, 2).write(map);
       cs = out.toString();

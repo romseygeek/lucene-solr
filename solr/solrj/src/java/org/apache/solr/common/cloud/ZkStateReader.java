@@ -88,6 +88,7 @@ public class ZkStateReader implements Closeable {
   public static final String REPLICATION_FACTOR = "replicationFactor";
   public static final String MAX_SHARDS_PER_NODE = "maxShardsPerNode";
   public static final String AUTO_ADD_REPLICAS = "autoAddReplicas";
+  public static final String MAX_CORES_PER_NODE = "maxCoresPerNode";
 
   public static final String ROLES = "/roles.json";
 
@@ -97,6 +98,8 @@ public class ZkStateReader implements Closeable {
   public static final String LEGACY_CLOUD = "legacyCloud";
 
   public static final String URL_SCHEME = "urlScheme";
+
+  public static final String BACKUP_LOCATION = "location";
 
   /** A view of the current state of all collections; combines all the different state sources into a single view. */
   protected volatile ClusterState clusterState;
@@ -134,7 +137,9 @@ public class ZkStateReader implements Closeable {
   public static final Set<String> KNOWN_CLUSTER_PROPS = unmodifiableSet(new HashSet<>(asList(
       LEGACY_CLOUD,
       URL_SCHEME,
-      AUTO_ADD_REPLICAS)));
+      AUTO_ADD_REPLICAS,
+      BACKUP_LOCATION,
+      MAX_CORES_PER_NODE)));
 
   /**
    * Returns config set name for collection.
@@ -382,8 +387,8 @@ public class ZkStateReader implements Closeable {
     if (securityNodeListener != null) {
       addSecuritynodeWatcher(pair -> {
         ConfigData cd = new ConfigData();
-        cd.data = pair.getKey() == null || pair.getKey().length == 0 ? EMPTY_MAP : Utils.getDeepCopy((Map) fromJSON(pair.getKey()), 4, false);
-        cd.version = pair.getValue() == null ? -1 : pair.getValue().getVersion();
+        cd.data = pair.first() == null || pair.first().length == 0 ? EMPTY_MAP : Utils.getDeepCopy((Map) fromJSON(pair.first()), 4, false);
+        cd.version = pair.second() == null ? -1 : pair.second().getVersion();
         securityData = cd;
         securityNodeListener.run();
       });
@@ -517,7 +522,8 @@ public class ZkStateReader implements Closeable {
    * In fact this is a clever way to avoid doing a ZK exists check on
    * the /collections/collection_name/state.json znode
    * Such an exists check is done in {@link ClusterState#hasCollection(String)} and
-   * {@link ClusterState#getCollections()} method as a safeguard against exposing wrong collection names to the users
+   * {@link ClusterState#getCollections()} and {@link ClusterState#getCollectionsMap()} methods
+   * have a safeguard against exposing wrong collection names to the users
    */
   private void refreshCollectionList(Watcher watcher) throws KeeperException, InterruptedException {
     synchronized (refreshCollectionListLock) {
@@ -712,8 +718,7 @@ public class ZkStateReader implements Closeable {
     Map<String,Slice> slices = clusterState.getSlicesMap(collection);
     if (slices == null) {
       throw new ZooKeeperException(ErrorCode.BAD_REQUEST,
-          "Could not find collection in zk: " + collection + " "
-              + clusterState.getCollections());
+          "Could not find collection in zk: " + collection);
     }
     
     Slice replicas = slices.get(shardId);
