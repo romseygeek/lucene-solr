@@ -26,6 +26,7 @@ import org.apache.solr.search.QParserPlugin;
  * Usage: {!mlt qf=queryField1,queryField2}uniqueId
  */
 public class MLTQParserPlugin extends QParserPlugin {
+
   public static final String NAME = "mlt";
   
   @Override
@@ -41,5 +42,20 @@ public class MLTQParserPlugin extends QParserPlugin {
     } else {
       return new SimpleMLTQParser(qstr, localParams, params, req);
     }
+  }
+
+  private static final String[] MLT_PARAMS = new String[]{
+    "fl", "qf", "mintf", "mindf", "maxdf", "minwl", "maxwl", "maxqt", "maxntp", "boost"
+  };
+
+  public static String buildMLTQuery(String id, SolrParams params) {
+    StringBuilder builder = new StringBuilder("{!mlt");
+    for (String param : MLT_PARAMS) {
+      String value = params.get("mlt." + param);
+      if (value != null)
+        builder.append(" ").append(param).append("=").append(value);
+    }
+    builder.append("}").append(id);
+    return builder.toString();
   }
 }

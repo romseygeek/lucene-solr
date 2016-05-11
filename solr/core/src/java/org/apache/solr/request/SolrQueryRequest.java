@@ -17,16 +17,16 @@
 
 package org.apache.solr.request;
 
-import org.apache.solr.response.SolrQueryResponse;
-import org.apache.solr.search.SolrIndexSearcher;
-import org.apache.solr.schema.IndexSchema;
-import org.apache.solr.util.RTimer;
+import java.io.Closeable;
+import java.security.Principal;
+import java.util.Map;
+
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.util.ContentStream;
 import org.apache.solr.core.SolrCore;
-
-import java.security.Principal;
-import java.util.Map;
+import org.apache.solr.schema.IndexSchema;
+import org.apache.solr.search.SolrIndexSearcher;
+import org.apache.solr.util.RTimer;
 
 /**
  * <p>Container for a request to execute a query.</p>
@@ -34,7 +34,7 @@ import java.util.Map;
  * 
  *
  */
-public interface SolrQueryRequest {
+public interface SolrQueryRequest extends Closeable {
 
   /** returns the current request parameters */
   public SolrParams getParams();

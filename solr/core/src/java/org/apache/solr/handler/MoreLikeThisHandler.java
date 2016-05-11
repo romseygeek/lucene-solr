@@ -16,9 +16,20 @@
  */
 
 package org.apache.solr.handler;
+import java.io.IOException;
+import java.io.Reader;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Pattern;
 
-import org.apache.lucene.index.ExitableDirectoryReader;
 import org.apache.lucene.document.Document;
+import org.apache.lucene.index.ExitableDirectoryReader;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.queries.mlt.MoreLikeThis;
@@ -26,23 +37,26 @@ import org.apache.lucene.search.BooleanClause;
 import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.TermQuery;
+import org.apache.solr.client.solrj.response.MoreLikeThisResponse;
+import org.apache.solr.client.solrj.response.QueryResponse;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.StringUtils;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.FacetParams;
+import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.MoreLikeThisParams;
 import org.apache.solr.common.params.MoreLikeThisParams.TermStyle;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.util.ContentStream;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.SimpleOrderedMap;
+import org.apache.solr.core.CoreContainer;
 import org.apache.solr.core.SolrCore;
 import org.apache.solr.handler.component.FacetComponent;
-import org.apache.solr.handler.component.SpatialHeatmapFacets;
-import org.apache.solr.handler.component.DateFacetProcessor;
-import org.apache.solr.handler.component.RangeFacetProcessor;
 import org.apache.solr.request.SimpleFacets;
 import org.apache.solr.request.SolrQueryRequest;
+import org.apache.solr.request.SolrQueryRequestBase;
+import org.apache.solr.request.SolrRequestHandler;
 import org.apache.solr.response.SolrQueryResponse;
 import org.apache.solr.schema.IndexSchema;
 import org.apache.solr.schema.SchemaField;
@@ -58,21 +72,10 @@ import org.apache.solr.search.SolrQueryTimeoutImpl;
 import org.apache.solr.search.SolrReturnFields;
 import org.apache.solr.search.SortSpec;
 import org.apache.solr.search.SyntaxError;
+import org.apache.solr.search.mlt.MLTQParserPlugin;
 import org.apache.solr.util.SolrPluginUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.io.Reader;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Comparator;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.regex.Pattern;
 
 /**
  * Solr MoreLikeThis --
@@ -94,7 +97,67 @@ public class MoreLikeThisHandler extends RequestHandlerBase
   }
 
   @Override
-  public void handleRequestBody(SolrQueryRequest req, SolrQueryResponse rsp) throws Exception 
+  public void handleRequestBody(SolrQueryRequest req, SolrQueryResponse rsp) throws Exception {
+    if (isDistributedQuery(req) == false)
+      handleUndistributedRequest(req, rsp);
+    else
+      handleDistributedRequest(req, rsp);
+  }
+
+  private static boolean isDistributedQuery(SolrQueryRequest req) {
+    final CoreContainer cc = req.getCore().getCoreDescriptor().getCoreContainer();
+    return req.getParams().getBool("distrib", cc.isZooKeeperAware());
+  }
+
+  private static void handleDistributedRequest(SolrQueryRequest req, SolrQueryResponse rsp) throws Exception {
+
+    final SolrParams params = req.getParams();
+
+    // build an MLT query out of the input parameters
+    final String id = getDocumentId(req);
+    addMLTHeader(id, rsp);
+    if (id == null)
+      return;
+
+    final String mltQuery = MLTQParserPlugin.buildMLTQuery(id, params);
+
+    final ModifiableSolrParams newParams = new ModifiableSolrParams(params);
+    newParams.set(CommonParams.Q, mltQuery);
+    try (SolrQueryRequest newReq = new SolrQueryRequestBase(req.getCore(), newParams) {}) {
+      // execute said MLT query
+      SolrRequestHandler handler = req.getCore().getRequestHandler(params.get(CommonParams.QT));
+      req.getCore().execute(handler, newReq, rsp);
+    }
+  }
+
+  private static void addMLTHeader(String id, SolrQueryResponse rsp) {
+    NamedList<Object> header = rsp.getResponseHeader();
+    if (id != null) {
+      header.add(MoreLikeThisResponse.MLT_DOCUMENT_ID, id);
+    }
+  }
+
+  // given a query, retrieve the first doc id that matches it
+  private static String getDocumentId(SolrQueryRequest req) {
+
+    ModifiableSolrParams params = new ModifiableSolrParams(req.getParams());
+    try (SolrQueryRequest subReq = new SolrQueryRequestBase(req.getCore(), params) {}) {
+
+      SolrRequestHandler handler = req.getCore().getRequestHandler(null);
+      SolrQueryResponse resp = new SolrQueryResponse();
+
+      handler.handleRequest(subReq, resp);
+      QueryResponse queryResponse = new QueryResponse();
+      queryResponse.setResponse(resp.getValues());
+
+      if (queryResponse.getResults().getNumFound() == 0)
+        return null;
+      String idField = req.getSchema().getUniqueKeyField().getName();
+      return queryResponse.getResults().get(0).get(idField).toString();
+    }
+  }
+
+  private void handleUndistributedRequest(SolrQueryRequest req, SolrQueryResponse rsp) throws Exception
   {
     SolrParams params = req.getParams();
 
