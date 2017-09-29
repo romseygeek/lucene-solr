@@ -16,10 +16,6 @@
  */
 package org.apache.solr.security;
 
-import java.io.IOException;
-import java.util.LinkedList;
-import java.util.List;
-
 import javax.servlet.FilterChain;
 import javax.servlet.FilterConfig;
 import javax.servlet.ServletException;
@@ -27,6 +23,9 @@ import javax.servlet.ServletRequest;
 import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletRequestWrapper;
+import java.io.IOException;
+import java.util.LinkedList;
+import java.util.List;
 
 import org.apache.curator.RetryPolicy;
 import org.apache.curator.framework.AuthInfo;
@@ -34,7 +33,6 @@ import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
 import org.apache.curator.framework.api.ACLProvider;
 import org.apache.curator.retry.ExponentialBackoffRetry;
-
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.server.AuthenticationHandler;
 import org.apache.hadoop.security.token.delegation.web.DelegationTokenAuthenticationFilter;
@@ -219,8 +217,7 @@ public class HadoopAuthFilter extends DelegationTokenAuthenticationFilter {
       List<AuthInfo> ret = new LinkedList<AuthInfo>();
 
       // In theory the credentials to add could change here if zookeeper hasn't been initialized
-      ZkCredentialsProvider credentialsProvider =
-        zkClient.getZkClientConnectionStrategy().getZkCredentialsToAddAutomatically();
+      ZkCredentialsProvider credentialsProvider = zkClient.getZkConnectionFactory().getCredentials();
       for (ZkCredentialsProvider.ZkCredentials zkCredentials : credentialsProvider.getCredentials()) {
         ret.add(new AuthInfo(zkCredentials.getScheme(), zkCredentials.getAuth()));
       }

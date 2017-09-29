@@ -16,9 +16,6 @@
  */
 package org.apache.solr.update.processor;
 
-import static org.apache.solr.common.params.CommonParams.DISTRIB;
-import static org.apache.solr.update.processor.DistributingUpdateProcessorFactory.DISTRIB_UPDATE_PARAM;
-
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
@@ -39,9 +36,8 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.CharsRefBuilder;
 import org.apache.solr.client.solrj.SolrRequest;
-import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.SolrRequest.METHOD;
-import org.apache.solr.common.cloud.DistributedQueue;
+import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.impl.HttpSolrClient;
 import org.apache.solr.client.solrj.request.GenericSolrRequest;
 import org.apache.solr.client.solrj.request.UpdateRequest;
@@ -56,6 +52,7 @@ import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.SolrInputField;
 import org.apache.solr.common.cloud.ClusterState;
 import org.apache.solr.common.cloud.CompositeIdRouter;
+import org.apache.solr.common.cloud.DistributedQueue;
 import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.common.cloud.DocRouter;
 import org.apache.solr.common.cloud.Replica;
@@ -99,6 +96,9 @@ import org.apache.solr.util.TimeOut;
 import org.apache.zookeeper.KeeperException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.solr.common.params.CommonParams.DISTRIB;
+import static org.apache.solr.update.processor.DistributingUpdateProcessorFactory.DISTRIB_UPDATE_PARAM;
 
 // NOT mt-safe... create a new processor for each add thread
 // TODO: we really should not wait for distrib after local? unless a certain replication factor is asked for
@@ -1751,7 +1751,7 @@ public class DistributedUpdateProcessor extends UpdateRequestProcessor {
       return;
     }
 
-    if (!zkController.getZkClient().getConnectionManager().isLikelyExpired()) {
+    if (zkController.getZkClient().getState() != SolrZkClient.State.CONNECTED) {
       return;
     }
     

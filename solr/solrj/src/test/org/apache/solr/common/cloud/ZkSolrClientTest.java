@@ -14,31 +14,31 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.solr.cloud;
+package org.apache.solr.common.cloud;
 
+import java.net.UnknownHostException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import junit.framework.Assert;
-
-import org.apache.solr.common.cloud.SolrZkClient;
-import org.apache.solr.common.cloud.ZkCmdExecutor;
-import org.apache.solr.common.cloud.ZkOperation;
-import org.apache.solr.util.AbstractSolrTestCase;
+import org.apache.solr.SolrTestCaseJ4;
+import org.apache.solr.cloud.AbstractZkTestCase;
+import org.apache.solr.cloud.ZkTestServer;
+import org.apache.solr.common.SolrException;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
 import org.junit.AfterClass;
-import org.junit.BeforeClass;
+import org.junit.Test;
 
-public class ZkSolrClientTest extends AbstractSolrTestCase {
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
-  @BeforeClass
-  public static void beforeClass() throws Exception {
-    initCore("solrconfig.xml", "schema.xml");
-  }
+public class ZkSolrClientTest extends SolrTestCaseJ4 {
+  private static final boolean DEBUG = false;
 
   static class ZkConnection implements AutoCloseable {
 
@@ -75,6 +75,14 @@ public class ZkSolrClientTest extends AbstractSolrTestCase {
     }
   }
 
+  @Test(expected = SolrException.class)
+  public void testInvalidZKAddress() throws Exception {
+    ZkConnectionFactory zf = mock(ZkConnectionFactory.class);
+    when(zf.createSolrZooKeeper(any(Watcher.class))).thenThrow(new UnknownHostException());
+    SolrZkClient zkClient = new SolrZkClient(zf);
+    zkClient.close();
+  }
+
   public void testConnect() throws Exception {
     try (ZkConnection conn = new ZkConnection (false)) {
       // do nothing
@@ -107,10 +115,54 @@ public class ZkSolrClientTest extends AbstractSolrTestCase {
     }
   }
 
+  static class CountingListener implements ZkConnectionListener {
+
+    int connects;
+    int expiries;
+
+    CountDownLatch connectSignal;
+    CountDownLatch expirySignal;
+
+    @Override
+    public void onConnect() {
+      connects++;
+      if (connectSignal != null)
+        connectSignal.countDown();
+    }
+
+    @Override
+    public void onSessionExpiry() {
+      expiries++;
+      if (expirySignal != null)
+        expirySignal.countDown();
+    }
+  }
+
+  // check that onExpiry is always called *before* onConnect
+  static class OrderingListener implements ZkConnectionListener {
+
+    int expiries;
+    int connects;
+
+    @Override
+    public void onConnect() {
+      connects++;
+      assertTrue(connects > expiries);
+    }
+
+    @Override
+    public void onSessionExpiry() {
+      expiries++;
+      assertTrue(connects == expiries);
+    }
+  }
+
   public void testReconnect() throws Exception {
     String zkDir = createTempDir("zkData").toFile().getAbsolutePath();
     ZkTestServer server = null;
     SolrZkClient zkClient = null;
+    CountingListener listener = new CountingListener();
+    OrderingListener expiryChecker = new OrderingListener();
     try {
       server = new ZkTestServer(zkDir);
       server.run();
@@ -118,16 +170,17 @@ public class ZkSolrClientTest extends AbstractSolrTestCase {
       AbstractZkTestCase.makeSolrZkNode(server.getZkHost());
 
       zkClient = new SolrZkClient(server.getZkAddress(), AbstractZkTestCase.TIMEOUT);
+      zkClient.registerConnectionListener(listener);
+      assertEquals(1, listener.connects);
+
       String shardsPath = "/collections/collection1/shards";
       zkClient.makePath(shardsPath, false, true);
 
       zkClient.makePath("collections/collection1", false, true);
       int zkServerPort = server.getPort();
+
       // this tests disconnect state
       server.shutdown();
-
-      Thread.sleep(80);
-
 
       try {
         zkClient.makePath("collections/collection2", false);
@@ -137,45 +190,38 @@ public class ZkSolrClientTest extends AbstractSolrTestCase {
       }
 
       // bring server back up
+      listener.connectSignal = new CountDownLatch(1);
       server = new ZkTestServer(zkDir, zkServerPort);
       server.run();
 
-      // TODO: can we do better?
-      // wait for reconnect
-      Thread.sleep(600);
+      while (zkClient.isConnected() == false) {
+        Thread.sleep(300);
+      }
 
-      try {
-        zkClient.makePath("collections/collection3", true);
-      } catch (KeeperException.ConnectionLossException e) {
-        Thread.sleep(5000); // try again in a bit
-        zkClient.makePath("collections/collection3", true);
+      // we should have reconnected before session timeout, so onConnect() is not called
+      assertEquals(1, listener.connects);
+
+      zkClient.makePath("collections/collection3", true);
+      if (DEBUG) {
+        zkClient.printLayoutToStdOut();
       }
 
       assertNotNull(zkClient.exists("/collections/collection3", null, true));
       assertNotNull(zkClient.exists("/collections/collection1", null, true));
       
       // simulate session expiration
-      
-      // one option
+      listener.expirySignal = new CountDownLatch(1);
+      listener.connectSignal = new CountDownLatch(1);
+      zkClient.registerConnectionListener(expiryChecker);
       long sessionId = zkClient.getSolrZooKeeper().getSessionId();
       server.expire(sessionId);
-      
-      // another option
-      //zkClient.getSolrZooKeeper().getConnection().disconnect();
 
       // this tests expired state
-
-      Thread.sleep(1000); // pause for reconnect
+      // onSessionExpiry() is called first, and then onConnect()
+      listener.expirySignal.await(AbstractZkTestCase.TIMEOUT, TimeUnit.MILLISECONDS);
+      listener.connectSignal.await(AbstractZkTestCase.TIMEOUT, TimeUnit.MILLISECONDS);
       
-      for (int i = 0; i < 8; i++) {
-        try {
-          zkClient.makePath("collections/collection4", true);
-          break;
-        } catch (KeeperException.SessionExpiredException | KeeperException.ConnectionLossException e) {
-
-        }
-        Thread.sleep(1000 * i);
-      }
+      zkClient.makePath("collections/collection4", true);
 
       assertNotNull("Node does not exist, but it should", zkClient.exists("/collections/collection4", null, true));
 
@@ -190,7 +236,7 @@ public class ZkSolrClientTest extends AbstractSolrTestCase {
     }
   }
   
-  public void testZkCmdExectutor() throws Exception {
+  public void testZkCmdExecutor() throws Exception {
     String zkDir = createTempDir("zkData").toFile().getAbsolutePath();
     ZkTestServer server = null;
 

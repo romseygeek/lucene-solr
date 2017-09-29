@@ -151,7 +151,7 @@ public class ZkClientClusterStateProvider implements ClusterStateProvider {
           } catch (Exception e) {
             if (zk != null) zk.close();
             // do not wrap because clients may be relying on the underlying exception being thrown
-            throw e;
+            throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
           }
         }
       }

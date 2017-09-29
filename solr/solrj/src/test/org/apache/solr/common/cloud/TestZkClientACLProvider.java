@@ -35,7 +35,7 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class SolrZkClientTest extends SolrTestCaseJ4 {
+public class TestZkClientACLProvider extends SolrTestCaseJ4 {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   
   private static final String ROOT = "/";
@@ -67,35 +67,29 @@ public class SolrZkClientTest extends SolrTestCaseJ4 {
 
     defaultClient = new SolrZkClient(zkServer.getZkAddress(), AbstractZkTestCase.TIMEOUT);
     defaultClient.makePath(PATH, true);
-    
-    aclClient = new SolrZkClient(zkServer.getZkAddress(), AbstractZkTestCase.TIMEOUT) {
+
+    ZkACLProvider aclProvider = new DefaultZkACLProvider() {
       @Override
-      protected ZkACLProvider createZkACLProvider() {
-        return new DefaultZkACLProvider() {
-          @Override
-          protected List<ACL> createGlobalACLsToAdd() {
-            try {
-              Id id = new Id(SCHEME, DigestAuthenticationProvider.generateDigest(AUTH));
-              return Collections.singletonList(new ACL(ZooDefs.Perms.ALL, id));
-            } catch (NoSuchAlgorithmException e) {
-              throw new RuntimeException(e);
-            }
-          }
-        };
+      protected List<ACL> createGlobalACLsToAdd() {
+        try {
+          Id id = new Id(SCHEME, DigestAuthenticationProvider.generateDigest(AUTH));
+          return Collections.singletonList(new ACL(ZooDefs.Perms.ALL, id));
+        } catch (NoSuchAlgorithmException e) {
+          throw new RuntimeException(e);
+        }
       }
     };
     
-    credentialsClient = new SolrZkClient(zkServer.getZkAddress(), AbstractZkTestCase.TIMEOUT) {
-      @Override
-      protected ZkCredentialsProvider createZkCredentialsToAddAutomatically() {
-        return new DefaultZkCredentialsProvider() {
+    aclClient = new SolrZkClient(zkServer.getZkAddress(), AbstractZkTestCase.TIMEOUT, aclProvider);
+
+    ZkConnectionFactory credentialsFactory = new ZkConnectionFactory(zkServer.getZkAddress(), AbstractZkTestCase.TIMEOUT,
+        new DefaultZkCredentialsProvider(){
           @Override
           protected Collection<ZkCredentials> createCredentials() {
             return Collections.singleton(new ZkCredentials(SCHEME, AUTH.getBytes(StandardCharsets.UTF_8)));
           }
-        };
-      }
-    };
+        });
+    credentialsClient = new SolrZkClient(credentialsFactory);
   }
   
   @Override

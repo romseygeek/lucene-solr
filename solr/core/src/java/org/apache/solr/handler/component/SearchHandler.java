@@ -30,6 +30,7 @@ import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.cloud.ZkController;
 import org.apache.solr.common.SolrDocumentList;
 import org.apache.solr.common.SolrException;
+import org.apache.solr.common.cloud.SolrZkClient;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.ShardParams;
@@ -233,10 +234,8 @@ public class SearchHandler extends RequestHandlerBase implements SolrCoreAware ,
       ZkController zkController = cc.getZkController();
       NamedList<Object> headers = rb.rsp.getResponseHeader();
       if(headers != null) {
-        headers.add("zkConnected", 
-            zkController != null 
-          ? !zkController.getZkClient().getConnectionManager().isLikelyExpired() 
-          : false);
+        headers.add("zkConnected",
+            zkController != null && zkController.getZkClient().getState() == SolrZkClient.State.CONNECTED);
       }
       
     }

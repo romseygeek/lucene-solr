@@ -16,6 +16,7 @@
  */
 package org.apache.solr.client.solrj.io.sql;
 
+import java.io.IOException;
 import java.sql.Array;
 import java.sql.Blob;
 import java.sql.CallableStatement;
@@ -320,7 +321,7 @@ class ConnectionImpl implements Connection {
         this.client.connect(timeout, TimeUnit.SECONDS);
         return true;
       }
-    } catch (InterruptedException|TimeoutException ignore) {
+    } catch (InterruptedException | TimeoutException ignore) {
       // Ignore error since connection is not valid
     }
     return false;

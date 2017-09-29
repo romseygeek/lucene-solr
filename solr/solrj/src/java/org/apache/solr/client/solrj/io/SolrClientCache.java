@@ -19,8 +19,8 @@ package org.apache.solr.client.solrj.io;
 import java.io.IOException;
 import java.io.Serializable;
 import java.lang.invoke.MethodHandles;
-import java.util.Map;
 import java.util.HashMap;
+import java.util.Map;
 
 import org.apache.http.client.HttpClient;
 import org.apache.solr.client.solrj.SolrClient;

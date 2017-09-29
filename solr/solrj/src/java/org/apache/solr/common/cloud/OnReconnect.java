@@ -16,6 +16,10 @@
  */
 package org.apache.solr.common.cloud;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+
+import org.apache.zookeeper.KeeperException;
+
 /**
  * Implementations are expected to implement a correct hashCode and equals
  * method needed to uniquely identify the listener as listeners are managed
@@ -24,5 +28,21 @@ package org.apache.solr.common.cloud;
  * when it no longer needs to be notified of ZK reconnection events.
  */
 public interface OnReconnect {
-  void command();
+  void command() throws KeeperException, InterruptedException;
+
+  static ZkConnectionListener toListener(OnReconnect onreconnect) {
+    return new ZkConnectionListener() {
+
+      AtomicBoolean firstTime = new AtomicBoolean(false);
+
+      @Override
+      public void onConnect() throws KeeperException, InterruptedException {
+        if (firstTime.get() == false) {
+          firstTime.set(true);
+          return;
+        }
+        onreconnect.command();
+      }
+    };
+  }
 }

@@ -16,6 +16,7 @@
  */
 package org.apache.solr.common.cloud;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
@@ -26,13 +27,14 @@ import java.security.PrivilegedAction;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
 
+import org.apache.solr.common.SolrException;
 import org.apache.solr.common.util.SuppressForbidden;
 import org.apache.zookeeper.ClientCnxn;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.ZooKeeper;
 
 // we use this class to expose nasty stuff for tests
-public class SolrZooKeeper extends ZooKeeper {
+public class SolrZooKeeper extends ZooKeeper implements Closeable {
   final Set<Thread> spawnedThreads = new CopyOnWriteArraySet<>();
   
   // for test debug
@@ -92,11 +94,18 @@ public class SolrZooKeeper extends ZooKeeper {
   }
   
   @Override
-  public synchronized void close() throws InterruptedException {
-    for (Thread t : spawnedThreads) {
-      if (t.isAlive()) t.interrupt();
+  public synchronized void close() {
+    try {
+      for (Thread t : spawnedThreads) {
+        if (t.isAlive()) t.interrupt();
+      }
+      super.close();
     }
-    super.close();
+    catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new ZooKeeperException(SolrException.ErrorCode.SERVER_ERROR, "Interrupted closing ZK connection", e);
+    }
+
   }
   
 //  public static void assertCloses() {

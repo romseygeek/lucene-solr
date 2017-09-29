@@ -16,6 +16,15 @@
  */
 package org.apache.solr.common.cloud;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+
 import com.google.common.base.Throwables;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.cloud.ZkTestServer;
@@ -27,15 +36,6 @@ import org.apache.zookeeper.server.auth.DigestAuthenticationProvider;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
-
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
 
 public class TestZkConfigManager extends SolrTestCaseJ4 {
 
@@ -60,7 +60,7 @@ public class TestZkConfigManager extends SolrTestCaseJ4 {
   }
 
   @Test
-  public void testUploadConfig() throws IOException {
+  public void testUploadConfig() throws Exception {
 
     zkServer.ensurePathExists("/solr");
 
@@ -119,7 +119,7 @@ public class TestZkConfigManager extends SolrTestCaseJ4 {
   }
 
   @Test
-  public void testUploadWithACL() throws IOException {
+  public void testUploadWithACL() throws Exception {
 
     zkServer.ensurePathExists("/acl");
 
@@ -195,18 +195,8 @@ public class TestZkConfigManager extends SolrTestCaseJ4 {
   }
 
   static SolrZkClient buildZkClient(String zkAddress, final ZkACLProvider aclProvider,
-                                    final ZkCredentialsProvider credentialsProvider) {
-    return new SolrZkClient(zkAddress, 10000){
-      @Override
-      protected ZkCredentialsProvider createZkCredentialsToAddAutomatically() {
-        return credentialsProvider;
-      }
-
-      @Override
-      protected ZkACLProvider createZkACLProvider() {
-        return aclProvider;
-      }
-    };
+                                    final ZkCredentialsProvider credentialsProvider) throws IOException, InterruptedException {
+    return new SolrZkClient(new ZkConnectionFactory(zkAddress, 10000, credentialsProvider), 10000, aclProvider);
   }
 
 }

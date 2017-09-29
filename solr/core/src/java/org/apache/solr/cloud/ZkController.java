@@ -60,7 +60,6 @@ import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
 import org.apache.solr.common.cloud.BeforeReconnect;
 import org.apache.solr.common.cloud.ClusterState;
-import org.apache.solr.common.cloud.DefaultConnectionStrategy;
 import org.apache.solr.common.cloud.DefaultZkACLProvider;
 import org.apache.solr.common.cloud.DefaultZkCredentialsProvider;
 import org.apache.solr.common.cloud.DocCollection;
@@ -72,6 +71,7 @@ import org.apache.solr.common.cloud.SolrZkClient;
 import org.apache.solr.common.cloud.ZkACLProvider;
 import org.apache.solr.common.cloud.ZkCmdExecutor;
 import org.apache.solr.common.cloud.ZkConfigManager;
+import org.apache.solr.common.cloud.ZkConnectionFactory;
 import org.apache.solr.common.cloud.ZkCoreNodeProps;
 import org.apache.solr.common.cloud.ZkCredentialsProvider;
 import org.apache.solr.common.cloud.ZkMaintenanceUtils;
@@ -291,7 +291,6 @@ public class ZkController {
     this.leaderConflictResolveWait = cloudConfig.getLeaderConflictResolveWait();
 
     this.clientTimeout = cloudConfig.getZkClientTimeout();
-    DefaultConnectionStrategy strat = new DefaultConnectionStrategy();
     String zkACLProviderClass = cloudConfig.getZkACLProviderClass();
     ZkACLProvider zkACLProvider = null;
     if (zkACLProviderClass != null && zkACLProviderClass.trim().length() > 0) {
@@ -300,20 +299,23 @@ public class ZkController {
       zkACLProvider = new DefaultZkACLProvider();
     }
 
+    ZkCredentialsProvider credentials;
     String zkCredentialsProviderClass = cloudConfig.getZkCredentialsProviderClass();
     if (zkCredentialsProviderClass != null && zkCredentialsProviderClass.trim().length() > 0) {
-      strat.setZkCredentialsToAddAutomatically(cc.getResourceLoader().newInstance(zkCredentialsProviderClass, ZkCredentialsProvider.class));
+      credentials = cc.getResourceLoader().newInstance(zkCredentialsProviderClass, ZkCredentialsProvider.class);
     } else {
-      strat.setZkCredentialsToAddAutomatically(new DefaultZkCredentialsProvider());
+      credentials = new DefaultZkCredentialsProvider();
     }
     addOnReconnectListener(getConfigDirListener());
 
-    zkClient = new SolrZkClient(zkServerAddress, clientTimeout, zkClientConnectTimeout, strat,
+    zkClient = new SolrZkClient(new ZkConnectionFactory(zkServerAddress, clientTimeout, credentials),
+        zkClientConnectTimeout,
         // on reconnect, reload cloud info
         new OnReconnect() {
 
           @Override
           public void command() {
+
             log.info("ZooKeeper session re-connected ... refreshing core states after session expiration.");
 
             try {
@@ -851,7 +853,7 @@ public class ZkController {
    * exist and 'create' = false
    */
   public static boolean checkChrootPath(String zkHost, boolean create)
-      throws KeeperException, InterruptedException {
+      throws KeeperException, InterruptedException, IOException {
     if (!SolrZkClient.containsChroot(zkHost)) {
       return true;
     }
@@ -859,7 +861,7 @@ public class ZkController {
     String chrootPath = zkHost.substring(zkHost.indexOf("/"), zkHost.length());
 
     SolrZkClient tmpClient = new SolrZkClient(zkHost.substring(0,
-        zkHost.indexOf("/")), 60000, 30000, null, null, null);
+        zkHost.indexOf("/")), 60000, 30000);
     boolean exists = tmpClient.exists(chrootPath, true);
     if (!exists && create) {
       tmpClient.makePath(chrootPath, false, true);

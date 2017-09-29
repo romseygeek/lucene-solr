@@ -17,6 +17,7 @@
 package org.apache.solr.common.cloud;
 
 import java.io.Closeable;
+import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.lang.invoke.MethodHandles;
 import java.net.URLDecoder;
@@ -231,25 +232,10 @@ public class ZkStateReader implements Closeable {
   }
 
 
-  public ZkStateReader(String zkServerAddress, int zkClientTimeout, int zkClientConnectTimeout) {
+  public ZkStateReader(String zkServerAddress, int zkClientTimeout, int zkClientConnectTimeout) throws IOException {
     this.zkClient = new SolrZkClient(zkServerAddress, zkClientTimeout, zkClientConnectTimeout,
         // on reconnect, reload cloud info
-        new OnReconnect() {
-          @Override
-          public void command() {
-            try {
-              ZkStateReader.this.createClusterStateWatchersAndUpdate();
-            } catch (KeeperException e) {
-              LOG.error("A ZK error has occurred", e);
-              throw new ZooKeeperException(SolrException.ErrorCode.SERVER_ERROR, "A ZK error has occurred", e);
-            } catch (InterruptedException e) {
-              // Restore the interrupted status
-              Thread.currentThread().interrupt();
-              LOG.error("Interrupted", e);
-              throw new ZooKeeperException(SolrException.ErrorCode.SERVER_ERROR, "Interrupted", e);
-            }
-          }
-        });
+        ZkStateReader.this::createClusterStateWatchersAndUpdate);
     this.configManager = new ZkConfigManager(zkClient);
     this.closeClient = true;
     this.securityNodeListener = null;
