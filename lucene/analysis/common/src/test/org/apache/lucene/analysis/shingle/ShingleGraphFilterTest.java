@@ -46,4 +46,85 @@ public class ShingleGraphFilterTest extends BaseTokenStreamTestCase {
 
   }
 
+  public void testBiGramNoUnigrams() throws IOException {
+
+    Analyzer analyzer = CustomAnalyzer.builder()
+        .withTokenizer("whitespace")
+        .addTokenFilter("shinglegraph", "maxShingleSize", "2", "minShingleSize", "2", "outputUnigrams", "false")
+        .build();
+
+    try (TokenStream ts = analyzer.tokenStream("field", "please divide this sentence into shingles")) {
+      assertTokenStreamContents(ts,
+          new String[] { "please divide", "divide this", "this sentence", "sentence into", "into shingles", "shingles" },
+          new int[] {     0,               7,             14,              19,              28,              33 },
+          new int[] {     13,              18,            27,              32,              41,              41 },
+          new String[] { "shingle",       "shingle",     "shingle",       "shingle",       "shingle",       "word" },
+          new int[] {     1,               1,             1,               1,               1,               1 },
+          new int[] {     2,               2,             2,               2,               2,               1 });
+    }
+
+  }
+
+  public void testTriGramFilter() throws IOException {
+
+    Analyzer analyzer = CustomAnalyzer.builder()
+        .withTokenizer("whitespace")
+        .addTokenFilter("shinglegraph", "maxShingleSize", "3", "minShingleSize", "2")
+        .build();
+
+    try (TokenStream ts = analyzer.tokenStream("field", "please divide this sentence into shingles")) {
+      assertTokenStreamContents(ts,
+          new String[] { "please divide this", "please divide", "please", "divide this sentence", "divide this", "divide",
+                         "this sentence into", "this sentence", "this", "sentence into shingles", "sentence into", "sentence",
+                         "into shingles", "into", "shingles" },
+          new int[] {     0,                    0,               0,        7,                      7,             7,
+                          14,                   14,              14,     19,                       19,              19,
+                          28,              28,     33 },
+          new int[] {     18,                   13,              6,        27,                     18,            13,
+                          32,                   27,              18,     41,                       32,              27,
+                          41,              32,     41 },
+          new String[] { "shingle",             "shingle",       "word",   "shingle",              "shingle",     "word",
+                         "shingle",             "shingle",       "word", "shingle",                "shingle",       "word",
+                         "shingle",       "word", "word" },
+          new int[] {     1,                     0,               0,        1,                      0,             0,
+                          1,                     0,               0,      1,                        0,               0,
+                          1,               0,      1 },
+          new int[] {     3,                     2,               1,        3,                      2,             1,
+                          3,                     2,               1,      3,                        2,               1,
+                          2,               1,      1 });
+    }
+
+  }
+
+  public void testTriGramNoUnigrams() throws IOException {
+
+    Analyzer analyzer = CustomAnalyzer.builder()
+        .withTokenizer("whitespace")
+        .addTokenFilter("shinglegraph", "maxShingleSize", "3", "minShingleSize", "2", "outputUnigrams", "false")
+        .build();
+
+    try (TokenStream ts = analyzer.tokenStream("field", "please divide this sentence into shingles")) {
+      assertTokenStreamContents(ts,
+          new String[] { "please divide this", "please divide", "divide this sentence", "divide this",
+              "this sentence into", "this sentence", "sentence into shingles", "sentence into",
+              "into shingles", "shingles" },
+          new int[] {     0,                    0,               7,                      7,
+              14,                   14,              19,                       19,
+              28,              33 },
+          new int[] {     18,                   13,              27,                     18,
+              32,                   27,              41,                       32,
+              41,              41 },
+          new String[] { "shingle",             "shingle",       "shingle",              "shingle",
+              "shingle",             "shingle",       "shingle",                "shingle",
+              "shingle",       "word" },
+          new int[] {     1,                     0,               1,                      0,
+              1,                     0,               1,                        0,
+              1,               1 },
+          new int[] {     3,                     2,               3,                      2,
+              3,                     2,               3,                        2,
+              2,               1 });
+    }
+
+  }
+
 }
