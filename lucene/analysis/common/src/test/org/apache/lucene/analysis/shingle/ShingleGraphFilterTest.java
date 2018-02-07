@@ -176,4 +176,44 @@ public class ShingleGraphFilterTest extends BaseTokenStreamTestCase {
 
   }
 
+  public void testConsecutiveStopwords() throws IOException {
+
+    Analyzer analyzer = CustomAnalyzer.builder()
+        .withTokenizer("whitespace")
+        .addTokenFilter("stop")
+        .addTokenFilter("shinglegraph", "maxShingleSize", "4", "minShingleSize", "4", "outputUnigrams", "false")
+        .build();
+
+    try (TokenStream ts = analyzer.tokenStream("field", "a b c d a a b c")) {
+      assertTokenStreamContents(ts,
+          new String[] { "b c d _", "c d _ _", "d _ _ b", "b c", "c"},
+          new int[] {    2,         4,         6,         12,      14 },
+          new int[] {    7,         7,         13,        15,      15 },
+          new int[] {    2,         1,         1,         3,       1 },
+          new int[] {    4,         4,         4,         2,       1 },
+          null);
+    }
+
+  }
+
+  public void testTrailingStopwords() throws IOException {
+
+    Analyzer analyzer = CustomAnalyzer.builder()
+        .withTokenizer("whitespace")
+        .addTokenFilter("stop")
+        .addTokenFilter("shinglegraph", "maxShingleSize", "4", "minShingleSize", "4", "outputUnigrams", "false")
+        .build();
+
+    try (TokenStream ts = analyzer.tokenStream("field", "b c d a")) {
+      assertTokenStreamContents(ts,
+          new String[] { "b c d _", "c d _", "d _" },
+          new int[] {    0,         2,       4 },
+          new int[] {    5,         5,       5 },
+          new int[] {    1,         1,         1 },
+          new int[] {    4,         3,         2 },
+          null);
+    }
+
+  }
+
 }
