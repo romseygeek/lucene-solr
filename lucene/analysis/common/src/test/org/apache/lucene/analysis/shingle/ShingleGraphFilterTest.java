@@ -46,6 +46,27 @@ public class ShingleGraphFilterTest extends BaseTokenStreamTestCase {
 
   }
 
+  public void testBiGramFilterWithAltSeparator() throws IOException {
+
+    Analyzer analyzer = CustomAnalyzer.builder()
+        .withTokenizer("whitespace")
+        .addTokenFilter("shinglegraph", "maxShingleSize", "2", "minShingleSize", "2", "outputUnigrams", "false",
+            "tokenSeparator", "<SEP>")
+        .build();
+
+    try (TokenStream ts = analyzer.tokenStream("field", "please divide this sentence into shingles")) {
+      assertTokenStreamContents(ts,
+          new String[] { "please<SEP>divide", "divide<SEP>this", "this<SEP>sentence", "sentence<SEP>into", "into<SEP>shingles", "shingles" },
+          new int[] {     0,               7,             14,              19,              28,              33 },
+          new int[] {     13,              18,            27,              32,              41,              41 },
+          new String[] { "shingle",       "shingle",     "shingle",       "shingle",       "shingle",       "word" },
+          new int[] {     1,               1,             1,               1,               1,               1 },
+          new int[] {     2,               2,             2,               2,               2,               1 });
+    }
+
+
+  }
+
   public void testBiGramNoUnigrams() throws IOException {
 
     Analyzer analyzer = CustomAnalyzer.builder()
