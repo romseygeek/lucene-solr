@@ -148,4 +148,32 @@ public class ShingleGraphFilterTest extends BaseTokenStreamTestCase {
 
   }
 
+  public void testWithStopwords() throws IOException {
+
+    Analyzer analyzer = CustomAnalyzer.builder()
+        .withTokenizer("whitespace")
+        .addTokenFilter("stop")
+        .addTokenFilter("shinglegraph", "maxShingleSize", "3", "minShingleSize", "2")
+        .build();
+
+    try (TokenStream ts = analyzer.tokenStream("field", "please divide this sentence into shingles")) {
+      assertTokenStreamContents(ts,
+          new String[] { "please divide _", "please divide", "please", "divide _ sentence", "divide _", "divide",
+              "sentence _ shingles", "sentence _", "sentence", "shingles" },
+          new int[] {     0,                 0,               0,        7,                   7,          7,
+              19,                     19,           19,         33 },
+          new int[] {     13,                13,              6,        27,                  13,         13,
+              41,                     27,           27,         41 },
+          new String[] { "shingle",          "shingle",       "word",   "shingle",           "shingle",  "word",
+              "shingle",             "shingle",     "word",    "word" },
+          new int[] {     1,                 0,               0,        1,                   0,          0,
+              2,                     0,              0,        2 },
+          new int[] {     3,                     2,           1,        3,                   2,          1,
+              3,                     2,              1,        1 });
+
+
+    }
+
+  }
+
 }

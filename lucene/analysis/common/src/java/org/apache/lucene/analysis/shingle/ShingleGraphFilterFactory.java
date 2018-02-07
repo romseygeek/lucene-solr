@@ -41,6 +41,6 @@ public class ShingleGraphFilterFactory extends TokenFilterFactory {
 
   @Override
   public TokenStream create(TokenStream input) {
-    return new ShingleGraphFilter(input, minShingleSize, maxShingleSize, outputUnigrams, tokenSeparator);
+    return new ShingleGraphFilter(input, minShingleSize, maxShingleSize, outputUnigrams, tokenSeparator, fillerToken);
   }
 }
