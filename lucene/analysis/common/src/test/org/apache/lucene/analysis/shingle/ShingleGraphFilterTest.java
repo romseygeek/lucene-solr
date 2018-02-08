@@ -22,7 +22,12 @@ import java.io.IOException;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.BaseTokenStreamTestCase;
 import org.apache.lucene.analysis.TokenStream;
+import org.apache.lucene.analysis.Tokenizer;
+import org.apache.lucene.analysis.core.WhitespaceTokenizer;
 import org.apache.lucene.analysis.custom.CustomAnalyzer;
+import org.apache.lucene.analysis.synonym.SynonymGraphFilter;
+import org.apache.lucene.analysis.synonym.SynonymMap;
+import org.apache.lucene.util.CharsRef;
 
 
 public class ShingleGraphFilterTest extends BaseTokenStreamTestCase {
@@ -211,6 +216,34 @@ public class ShingleGraphFilterTest extends BaseTokenStreamTestCase {
           new int[] {    5,         5,       5 },
           new int[] {    1,         1,         1 },
           new int[] {    4,         3,         2 },
+          null);
+    }
+
+  }
+
+  public void testIncomingGraphs() throws IOException {
+
+    SynonymMap.Builder synonymBuilder = new SynonymMap.Builder();
+    synonymBuilder.add(new CharsRef("a"), new CharsRef("b"), true);
+    SynonymMap synonymMap = synonymBuilder.build();
+
+    Analyzer analyzer = new Analyzer() {
+      @Override
+      protected TokenStreamComponents createComponents(String fieldName) {
+        Tokenizer source = new WhitespaceTokenizer();
+        TokenStream sink
+            = new ShingleGraphFilter(new SynonymGraphFilter(source, synonymMap, true), 2, 2, false);
+        return new TokenStreamComponents(source, sink);
+      }
+    };
+
+    try (TokenStream ts = analyzer.tokenStream("field", "a c a d")) {
+      assertTokenStreamContents(ts,
+          new String[] { "b c", "a c", "c b", "c a", "b d", "a d", "d" },
+          new int[] {    0,     0,     2,     2,     4,     4,     6 },
+          new int[] {    3,     3,     5,     5,     7,     7,     7 },
+          new int[] {    1,     0,     1,     0,     1,     0,     1 },
+          new int[] {    2,     2,     2,     2,     2,     2,     1 },
           null);
     }
 

@@ -48,11 +48,16 @@ public final class ShingleGraphFilter extends TokenFilter {
   private final CharTermAttribute termAtt = addAttribute(CharTermAttribute.class);
   private final TypeAttribute typeAtt = addAttribute(TypeAttribute.class);
 
-  private Token[] tokens;
+  private Token[] currentShingleTokens;
+  private Token[] tokenStackBaseTokens;
   private int[] tokenStackSize;
   private int[] currentStackPos;
   private int shingleSize;
   private boolean unigramDone;
+
+  public ShingleGraphFilter(TokenStream input, int minShingleSize, int maxShingleSize, boolean emitUnigrams) {
+    this(input, minShingleSize, maxShingleSize, emitUnigrams, " ", "_");
+  }
 
   public ShingleGraphFilter(TokenStream input, int minShingleSize, int maxShingleSize, boolean emitUnigrams, String tokenSeparator, String fillerToken) {
     super(input);
@@ -63,7 +68,8 @@ public final class ShingleGraphFilter extends TokenFilter {
 
     this.GAP_TOKEN.termAtt.setEmpty().append(fillerToken);
 
-    this.tokens = new Token[maxShingleSize];
+    this.currentShingleTokens = new Token[maxShingleSize];
+    this.tokenStackBaseTokens = new Token[maxShingleSize];
     this.tokenStackSize = new int[maxShingleSize];   // number of stacked tokens at given position in the shingle
     this.currentStackPos = new int[maxShingleSize];  // current depth in the token stack for each position in the shingle
   }
@@ -72,22 +78,22 @@ public final class ShingleGraphFilter extends TokenFilter {
   public boolean incrementToken() throws IOException {
     int posInc = 0;
     if (nextShingle() == false) {
-      Token nextRoot = nextToken(tokens[0]);
+      Token nextRoot = nextToken(currentShingleTokens[0]);
       if (nextRoot == END_TOKEN)
         return false;
-      recycleToken(tokens[0]);
+      recycleToken(currentShingleTokens[0]);
       reset(nextRoot);
-      posInc = tokens[0].posInc();
+      posInc = currentShingleTokens[0].posInc();
     }
     clearAttributes();
     lenAtt.setPositionLength(shingleSize);
     incAtt.setPositionIncrement(posInc);
-    offsetAtt.setOffset(tokens[0].startOffset(), lastToken().endOffset());
+    offsetAtt.setOffset(currentShingleTokens[0].startOffset(), lastToken().endOffset());
     termAtt.setEmpty();
-    termAtt.append(tokens[0].term());
-    typeAtt.setType(shingleSize > 1 ? "shingle" : tokens[0].type());
+    termAtt.append(currentShingleTokens[0].term());
+    typeAtt.setType(shingleSize > 1 ? "shingle" : currentShingleTokens[0].type());
     for (int i = 1; i < shingleSize; i++) {
-      termAtt.append(tokenSeparator).append(tokens[i].term());
+      termAtt.append(tokenSeparator).append(currentShingleTokens[i].term());
     }
     return true;
   }
@@ -95,25 +101,25 @@ public final class ShingleGraphFilter extends TokenFilter {
   @Override
   public void reset() throws IOException {
     super.reset();
-    this.tokens[0] = null;
+    this.currentShingleTokens[0] = null;
   }
 
   private Token lastToken() {
     int lastTokenIndex = shingleSize - 1;
-    while (tokens[lastTokenIndex] == GAP_TOKEN) {
+    while (currentShingleTokens[lastTokenIndex] == GAP_TOKEN) {
       lastTokenIndex--;
     }
-    return tokens[lastTokenIndex];
+    return currentShingleTokens[lastTokenIndex];
   }
 
   private void reset(Token token) throws IOException {
-    this.tokens[0] = token;
+    this.currentShingleTokens[0] = token;
     this.tokenStackSize[0] = 0;   // other tokens at this position are dealt with in the next shingle
     this.shingleSize = maxShingleSize;
     this.unigramDone = !emitUnigrams;
     Arrays.fill(this.currentStackPos, 0);
     token: for (int i = 1; i < maxShingleSize; i++) {
-      Token current = this.tokens[i - 1];
+      Token current = this.currentShingleTokens[i - 1];
       int length = current.length();
       // skip to first token {length} positions down the line
       while (length > 0) {
@@ -123,7 +129,7 @@ public final class ShingleGraphFilter extends TokenFilter {
           if (this.shingleSize > 1) {
             // fill in any trailing gaps
             for (int j = 1; j < shingleSize; j++) {
-              this.tokens[i] = GAP_TOKEN;
+              this.currentShingleTokens[i] = GAP_TOKEN;
               i++;
               if (i >= maxShingleSize) {
                 break token;
@@ -137,24 +143,25 @@ public final class ShingleGraphFilter extends TokenFilter {
       if (current.posInc() > 1) {
         // insert gaps into the shingle list
         for (int j = 1; j < current.posInc(); j++) {
-          this.tokens[i] = GAP_TOKEN;
+          this.currentShingleTokens[i] = GAP_TOKEN;
           i++;
           if (i >= maxShingleSize) {
             break token;
           }
         }
       }
-      this.tokens[i] = current;
+      this.currentShingleTokens[i] = current;
       // get depth of token stack at this position
+      tokenStackBaseTokens[i] = current;
       tokenStackSize[i] = 0;
-      for (Token t = current; t.posInc() == 0; t = t.nextToken) {
+      for (Token t = nextToken(current); t != END_TOKEN && t.posInc() == 0; t = nextToken(t)) {
         tokenStackSize[i]++;
       }
     }
   }
 
-  private boolean nextShingle() {
-    if (tokens[0] == null)
+  private boolean nextShingle() throws IOException {
+    if (currentShingleTokens[0] == null)
       return false;
     if (shingleSize <= minShingleSize) {
       if (hasStackedTokens()) {
@@ -181,13 +188,19 @@ public final class ShingleGraphFilter extends TokenFilter {
     return false;
   }
 
-  private void advanceStack() {
-    for (int i = maxShingleSize; i >= 1; i--) {
+  private void advanceStack() throws IOException {
+    for (int i = maxShingleSize - 1; i >= 1; i--) {
       if (currentStackPos[i] < tokenStackSize[i]) {
         currentStackPos[i]++;
+        Token stackedToken = tokenStackBaseTokens[i];
+        for (int j = 0; j < currentStackPos[i]; j++) {
+          stackedToken = nextToken(stackedToken);
+        }
+        currentShingleTokens[i] = stackedToken;
         return;
       }
       currentStackPos[i] = 0;
+      currentShingleTokens[i] = tokenStackBaseTokens[i];
     }
   }
 
@@ -207,9 +220,9 @@ public final class ShingleGraphFilter extends TokenFilter {
   // for testing
   int instantiatedTokenCount() {
     int tokenCount = tokenPool.size() + 1;
-    if (tokens[0] == END_TOKEN || tokens[0] == null)
+    if (currentShingleTokens[0] == END_TOKEN || currentShingleTokens[0] == null)
       return tokenCount;
-    for (Token t = tokens[0]; t != END_TOKEN && t != null; t = t.nextToken) {
+    for (Token t = currentShingleTokens[0]; t != END_TOKEN && t != null; t = t.nextToken) {
       tokenCount++;
     }
     return tokenCount;
