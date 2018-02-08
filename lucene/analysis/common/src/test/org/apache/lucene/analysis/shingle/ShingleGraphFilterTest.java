@@ -18,13 +18,17 @@
 package org.apache.lucene.analysis.shingle;
 
 import java.io.IOException;
+import java.io.StringReader;
+import java.text.ParseException;
 
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.BaseTokenStreamTestCase;
+import org.apache.lucene.analysis.MockAnalyzer;
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.Tokenizer;
 import org.apache.lucene.analysis.core.WhitespaceTokenizer;
 import org.apache.lucene.analysis.custom.CustomAnalyzer;
+import org.apache.lucene.analysis.synonym.SolrSynonymParser;
 import org.apache.lucene.analysis.synonym.SynonymGraphFilter;
 import org.apache.lucene.analysis.synonym.SynonymMap;
 import org.apache.lucene.util.CharsRef;
@@ -272,6 +276,44 @@ public class ShingleGraphFilterTest extends BaseTokenStreamTestCase {
           new int[] {    5,        5,      5,       5,       7,        7,       7,     7,     7 },
           new int[] {    1,        0,      0,       0,       1,        0,       1,     0,     1 },
           new int[] {    3,        3,      3,       3,       3,        3,       2,     2,     1 },
+          null);
+    }
+
+  }
+
+  public void testMultiLengthPathShingles() throws IOException, ParseException {
+
+    String testFile = "usa,united states,united states of america";
+    Analyzer mockAnalyzer = new MockAnalyzer(random());
+    SolrSynonymParser parser = new SolrSynonymParser(true, true, mockAnalyzer);
+
+    parser.parse(new StringReader(testFile));
+    mockAnalyzer.close();
+
+    SynonymMap synonymMap = parser.build();
+
+    Analyzer analyzer = new Analyzer() {
+      @Override
+      protected TokenStreamComponents createComponents(String fieldName) {
+        Tokenizer source = new WhitespaceTokenizer();
+        TokenStream sink
+            = new ShingleGraphFilter(new SynonymGraphFilter(source, synonymMap, true), 3, 3, false);
+        return new TokenStreamComponents(source, sink);
+      }
+    };
+
+    try (TokenStream ts = analyzer.tokenStream("field", "the usa is big")) {
+      assertTokenStreamContents(ts,
+          new String[]{ "the united states", "the united states", "the usa is", "united states is", "united states of",
+              "usa is big", "states is big", "states of america", "of america is", "america is big", "is big", "big" },
+          new int[]{    0,                   0,                   0,            4,                  4,
+              4,            4,                   4,               4,               4,                8,        11 },
+          new int[]{    7,                   7,                   10,           10,                 7,
+              14,           14,                   7,              10,               14,               14,       14 },
+          new int[]{    1,                   0,                   0,            1,                  0,
+              0,            1,                   1,               1,               1,                1,        1 },
+          new int[]{    6,                   4,                   7,            6,                  4,
+              7,            6,                   3,               3,               3,                2,        1 },
           null);
     }
 
