@@ -249,4 +249,32 @@ public class ShingleGraphFilterTest extends BaseTokenStreamTestCase {
 
   }
 
+  public void testShinglesSpanningGraphs() throws IOException {
+
+    SynonymMap.Builder synonymBuilder = new SynonymMap.Builder();
+    synonymBuilder.add(new CharsRef("a"), new CharsRef("b"), true);
+    SynonymMap synonymMap = synonymBuilder.build();
+
+    Analyzer analyzer = new Analyzer() {
+      @Override
+      protected TokenStreamComponents createComponents(String fieldName) {
+        Tokenizer source = new WhitespaceTokenizer();
+        TokenStream sink
+            = new ShingleGraphFilter(new SynonymGraphFilter(source, synonymMap, true), 3, 3, false);
+        return new TokenStreamComponents(source, sink);
+      }
+    };
+
+    try (TokenStream ts = analyzer.tokenStream("field", "a c a d")) {
+      assertTokenStreamContents(ts,
+          new String[] { "b c b", "b c a", "a c b", "a c a", "c b d", "c a d", "b d", "a d", "d" },
+          new int[] {    0,        0,      0,       0,       2,        2,       4,     4,     6 },
+          new int[] {    5,        5,      5,       5,       7,        7,       7,     7,     7 },
+          new int[] {    1,        0,      0,       0,       1,        0,       1,     0,     1 },
+          new int[] {    3,        3,      3,       3,       3,        3,       2,     2,     1 },
+          null);
+    }
+
+  }
+
 }
