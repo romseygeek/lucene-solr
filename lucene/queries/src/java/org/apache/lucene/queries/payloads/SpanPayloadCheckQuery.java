@@ -33,13 +33,13 @@ import org.apache.lucene.search.LeafSimScorer;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.QueryVisitor;
 import org.apache.lucene.search.ScoreMode;
-import org.apache.lucene.search.spans.FilterSpans;
-import org.apache.lucene.search.spans.FilterSpans.AcceptStatus;
-import org.apache.lucene.search.spans.SpanCollector;
-import org.apache.lucene.search.spans.SpanQuery;
-import org.apache.lucene.search.spans.SpanScorer;
-import org.apache.lucene.search.spans.SpanWeight;
-import org.apache.lucene.search.spans.Spans;
+import org.apache.lucene.queries.spans.FilterSpans;
+import org.apache.lucene.queries.spans.FilterSpans.AcceptStatus;
+import org.apache.lucene.queries.spans.SpanCollector;
+import org.apache.lucene.queries.spans.SpanQuery;
+import org.apache.lucene.queries.spans.SpanScorer;
+import org.apache.lucene.queries.spans.SpanWeight;
+import org.apache.lucene.queries.spans.Spans;
 import org.apache.lucene.util.BytesRef;
 
 /**
@@ -51,7 +51,7 @@ public class SpanPayloadCheckQuery extends SpanQuery {
   protected final SpanQuery match;
 
   /**
-   * @param match The underlying {@link org.apache.lucene.search.spans.SpanQuery} to check
+   * @param match The underlying {@link org.apache.lucene.queries.spans.SpanQuery} to check
    * @param payloadToMatch The {@link java.util.List} of payloads to match
    */
   public SpanPayloadCheckQuery(SpanQuery match, List<BytesRef> payloadToMatch) {

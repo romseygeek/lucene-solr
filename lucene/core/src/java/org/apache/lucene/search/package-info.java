@@ -32,8 +32,7 @@
  * <a name="search"></a>
  * <h2>Search Basics</h2>
  * <p>
- * Lucene offers a wide variety of {@link org.apache.lucene.search.Query} implementations, most of which are in
- * this package, its subpackage ({@link org.apache.lucene.search.spans spans}),
+ * Lucene offers a wide variety of {@link org.apache.lucene.search.Query} implementations, most of which are in this package,
  * or the <a href="{@docRoot}/../queries/overview-summary.html">queries module</a>. These implementations can be combined in a wide 
  * variety of ways to provide complex querying capabilities along with information about where matches took place in the document 
  * collection. The <a href="#query">Query Classes</a> section below highlights some of the more important Query classes. For details 
@@ -121,7 +120,7 @@
  * <h3>Phrases</h3>
  * 
  * <p>Another common search is to find documents containing certain phrases. This
- *     is handled three different ways:
+ *     is handled in two different ways:
  *     <ol>
  *         <li>
  *             <p>{@link org.apache.lucene.search.PhraseQuery PhraseQuery}
@@ -137,18 +136,10 @@
  *                 for a position in the phrase. For example, this can be used to perform phrase queries that also
  *                 incorporate synonyms.
  *         </li>
- *         <li>
- *             <p>{@link org.apache.lucene.search.spans.SpanNearQuery SpanNearQuery}
- *                 &mdash; Matches a sequence of other
- *                 {@link org.apache.lucene.search.spans.SpanQuery SpanQuery}
- *                 instances. {@link org.apache.lucene.search.spans.SpanNearQuery SpanNearQuery} allows for
- *                 much more
- *                 complicated phrase queries since it is constructed from other 
- *                     {@link org.apache.lucene.search.spans.SpanQuery SpanQuery}
- *                 instances, instead of only {@link org.apache.lucene.search.TermQuery TermQuery}
- *                 instances.</p>
- *         </li>
  *     </ol>
+ *
+ *     You can also use Span or Interval queries to build more complex positional queries, which can
+ *     be found in the <a href="{@docRoot}/../queries/overview-summary.html">Queries module</a>
  * 
  * <h3>
  *     {@link org.apache.lucene.search.PointRangeQuery PointRangeQuery}

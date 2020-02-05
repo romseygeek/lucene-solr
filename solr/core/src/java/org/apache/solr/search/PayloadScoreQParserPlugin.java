@@ -24,7 +24,7 @@ import org.apache.lucene.queries.payloads.PayloadDecoder;
 import org.apache.lucene.queries.payloads.PayloadFunction;
 import org.apache.lucene.queries.payloads.PayloadScoreQuery;
 import org.apache.lucene.search.Query;
-import org.apache.lucene.search.spans.SpanQuery;
+import org.apache.lucene.queries.spans.SpanQuery;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.request.SolrQueryRequest;

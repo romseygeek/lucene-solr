@@ -29,7 +29,7 @@ import org.apache.lucene.analysis.tokenattributes.PositionIncrementAttribute;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.memory.MemoryIndex;
 import org.apache.lucene.search.Query;
-import org.apache.lucene.search.spans.SpanQuery;
+import org.apache.lucene.queries.spans.SpanQuery;
 
 /**
  * {@link Scorer} implementation which scores text fragments by the number of

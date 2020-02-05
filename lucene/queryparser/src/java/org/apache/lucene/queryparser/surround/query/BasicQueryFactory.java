@@ -26,7 +26,7 @@ package org.apache.lucene.queryparser.surround.query;
  
 import org.apache.lucene.index.Term;
 import org.apache.lucene.search.TermQuery;
-import org.apache.lucene.search.spans.SpanTermQuery;
+import org.apache.lucene.queries.spans.SpanTermQuery;
 
 /** Factory for creating basic term queries */
 public class BasicQueryFactory {

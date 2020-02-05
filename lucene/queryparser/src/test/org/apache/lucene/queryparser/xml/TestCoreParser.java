@@ -27,7 +27,7 @@ import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TopDocs;
-import org.apache.lucene.search.spans.SpanQuery;
+import org.apache.lucene.queries.spans.SpanQuery;
 import org.apache.lucene.util.LuceneTestCase;
 import org.junit.AfterClass;
 import org.xml.sax.SAXException;

@@ -25,7 +25,7 @@ import org.apache.lucene.search.BooleanClause;
 import org.apache.lucene.search.FuzzyQuery;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.QueryVisitor;
-import org.apache.lucene.search.spans.SpanQuery;
+import org.apache.lucene.queries.spans.SpanQuery;
 import org.apache.lucene.util.automaton.ByteRunAutomaton;
 
 /**

@@ -58,12 +58,8 @@ import org.apache.lucene.search.DocIdSetIterator;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.PhraseQuery;
 import org.apache.lucene.search.Query;
-import org.apache.lucene.search.RegexpQuery;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.TopDocs;
-import org.apache.lucene.search.spans.SpanMultiTermQueryWrapper;
-import org.apache.lucene.search.spans.SpanOrQuery;
-import org.apache.lucene.search.spans.SpanQuery;
 import org.apache.lucene.store.ByteBuffersDirectory;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.util.ByteBlockPool;
@@ -373,32 +369,6 @@ public class TestMemoryIndexAgainstDirectory extends BaseTokenStreamTestCase {
       reader.close();
       memory.reset();
     }
-  }
-
-  // LUCENE-3831
-  public void testNullPointerException() throws IOException {
-    RegexpQuery regex = new RegexpQuery(new Term("field", "worl."));
-    SpanQuery wrappedquery = new SpanMultiTermQueryWrapper<>(regex);
-        
-    MemoryIndex mindex = randomMemoryIndex();
-    mindex.addField("field", new MockAnalyzer(random()).tokenStream("field", "hello there"));
-
-    // This throws an NPE
-    assertEquals(0, mindex.search(wrappedquery), 0.00001f);
-    TestUtil.checkReader(mindex.createSearcher().getIndexReader());
-  }
-    
-  // LUCENE-3831
-  public void testPassesIfWrapped() throws IOException {
-    RegexpQuery regex = new RegexpQuery(new Term("field", "worl."));
-    SpanQuery wrappedquery = new SpanOrQuery(new SpanMultiTermQueryWrapper<>(regex));
-
-    MemoryIndex mindex = randomMemoryIndex();
-    mindex.addField("field", new MockAnalyzer(random()).tokenStream("field", "hello there"));
-
-    // This passes though
-    assertEquals(0, mindex.search(wrappedquery), 0.00001f);
-    TestUtil.checkReader(mindex.createSearcher().getIndexReader());
   }
   
   public void testSameFieldAddedMultipleTimes() throws IOException {

@@ -38,10 +38,6 @@ import org.apache.lucene.search.PhraseQuery;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.SynonymQuery;
 import org.apache.lucene.search.TermQuery;
-import org.apache.lucene.search.spans.SpanNearQuery;
-import org.apache.lucene.search.spans.SpanOrQuery;
-import org.apache.lucene.search.spans.SpanQuery;
-import org.apache.lucene.search.spans.SpanTermQuery;
 import org.apache.lucene.util.automaton.CharacterRunAutomaton;
 import org.apache.lucene.util.automaton.RegExp;
 
@@ -161,17 +157,16 @@ public class TestQueryBuilder extends LuceneTestCase {
 
   /** forms graph query */
   public void testMultiWordSynonymsPhrase() throws Exception {
-    SpanNearQuery expectedNear = SpanNearQuery.newOrderedNearQuery("field")
-        .addClause(new SpanTermQuery(new Term("field", "guinea")))
-        .addClause(new SpanTermQuery(new Term("field", "pig")))
-        .setSlop(0)
+
+    BooleanQuery expected = new BooleanQuery.Builder()
+        .add(new PhraseQuery.Builder()
+            .add(new Term("field", "guinea"))
+            .add(new Term("field", "pig")).build(), BooleanClause.Occur.SHOULD)
+        .add(new TermQuery(new Term("field", "cavy")), BooleanClause.Occur.SHOULD)
         .build();
 
-    SpanTermQuery expectedTerm = new SpanTermQuery(new Term("field", "cavy"));
-
     QueryBuilder queryBuilder = new QueryBuilder(new MockSynonymAnalyzer());
-    assertEquals(new SpanOrQuery(new SpanQuery[]{expectedNear, expectedTerm}),
-        queryBuilder.createPhraseQuery("field", "guinea pig"));
+    assertEquals(expected, queryBuilder.createPhraseQuery("field", "guinea pig"));
   }
 
   public void testMultiWordSynonymsPhraseWithSlop() throws Exception {
