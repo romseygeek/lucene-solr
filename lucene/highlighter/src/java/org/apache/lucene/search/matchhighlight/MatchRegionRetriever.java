@@ -20,12 +20,14 @@ import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.tokenattributes.OffsetAttribute;
 import org.apache.lucene.analysis.tokenattributes.PositionIncrementAttribute;
+import org.apache.lucene.analysis.tokenattributes.TermToBytesRefAttribute;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.FieldInfo;
 import org.apache.lucene.index.FieldInfos;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.LeafReader;
 import org.apache.lucene.index.LeafReaderContext;
+import org.apache.lucene.index.Term;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Matches;
 import org.apache.lucene.search.MatchesIterator;
@@ -33,6 +35,7 @@ import org.apache.lucene.search.Query;
 import org.apache.lucene.search.QueryVisitor;
 import org.apache.lucene.search.ScoreMode;
 import org.apache.lucene.search.Weight;
+import org.apache.lucene.util.BytesRef;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -47,6 +50,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 /**
  * Utility class to compute a list of "hit regions" for a given query, searcher and
@@ -202,8 +206,8 @@ public class MatchRegionRetriever {
 
           case DOCS_AND_FREQS:
           case DOCS:
-            // offsetStrategy = new OffsetsFromTokens(field, analyzer);
-            offsetStrategy = new OffsetsFromValues(field, analyzer);
+            offsetStrategy = new OffsetsFromTokens(field, analyzer);
+            //offsetStrategy = new OffsetsFromValues(field, analyzer);
             break;
 
           default:
@@ -356,6 +360,12 @@ public class MatchRegionRetriever {
     @Override
     public List<OffsetRange> get(MatchesIterator matchesIterator, FieldValueProvider doc) throws IOException {
       List<CharSequence> values = doc.getValues(field);
+      Set<Term> terms = new HashSet<>();
+      while (matchesIterator.next()) {
+        Query q = matchesIterator.getQuery();
+        q.visit(QueryVisitor.termCollector(terms));
+      }
+      Set<BytesRef> tokens = terms.stream().map(Term::bytes).collect(Collectors.toSet());
 
       ArrayList<OffsetRange> ranges = new ArrayList<>();
       int valueOffset = 0;
@@ -364,11 +374,14 @@ public class MatchRegionRetriever {
 
         TokenStream ts = analyzer.tokenStream(field, value);
         OffsetAttribute offsetAttr = ts.getAttribute(OffsetAttribute.class);
+        TermToBytesRefAttribute termAttr = ts.getAttribute(TermToBytesRefAttribute.class);
         ts.reset();
         while (ts.incrementToken()) {
-          int startOffset = valueOffset + offsetAttr.startOffset();
-          int endOffset = valueOffset + offsetAttr.endOffset();
-          ranges.add(new OffsetRange(startOffset, endOffset));
+          if (tokens.contains(termAttr.getBytesRef())) {
+            int startOffset = valueOffset + offsetAttr.startOffset();
+            int endOffset = valueOffset + offsetAttr.endOffset();
+            ranges.add(new OffsetRange(startOffset, endOffset));
+          }
         }
         ts.end();
         valueOffset += offsetAttr.endOffset() + analyzer.getOffsetGap(field);

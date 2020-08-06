@@ -562,8 +562,8 @@ public class MatchRegionRetrieverTest extends LuceneTestCase {
     String field = FLD_TEXT_NOPOS;
     withReader(
         List.of(
-            Map.of(FLD_TEXT_NOPOS, values("foo bar")),
-            Map.of(FLD_TEXT_NOPOS, values("foo bar", "baz baz"))
+            Map.of(FLD_TEXT_NOPOS, values("foo bar", "baz baz")),
+            Map.of(FLD_TEXT_NOPOS, values("foo bar", "bar baz"))
             ),
         reader -> {
           Assertions.assertThat(
@@ -571,8 +571,8 @@ public class MatchRegionRetrieverTest extends LuceneTestCase {
                       reader,
                       new TermQuery(new Term(field, "bar"))))
               .containsOnly(
-                  fmt("0: (%s: '>foo bar<')", field),
-                  fmt("1: (%s: '>foo bar< | >baz baz<')", field));
+                  fmt("0: (%s: 'foo >bar<')", field),
+                  fmt("1: (%s: 'foo >bar< | >bar< baz')", field));
         });
   }
 
